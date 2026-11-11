@@ -193,7 +193,9 @@ public final class Announcements implements LinkWatcher {
                 .broadcast(server)
                 // Credits live on the site and a line here never moves them, so a balance question answers none.
                 .wallet(Wallet.empty())
-                .consoleSink(line -> server.dispatchCommand(server.getConsoleSender(), line))
+                // A console command belongs on the global region. The lists for players run on each player's own
+                // thread, and on Folia a console command dispatched from there runs off the thread it must own.
+                .consoleSink(line -> scheduler.global(() -> server.dispatchCommand(server.getConsoleSender(), line)))
                 // 0.174.0 hands a bar to whoever built the context, so a wait that ends early can take it down.
                 // Nothing here takes one down yet, so a bar runs its seconds, as it did before.
                 .barShown((reader, bar) -> {})
