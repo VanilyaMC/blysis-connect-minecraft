@@ -61,7 +61,10 @@ public final class SqlJournal implements Journal {
     public boolean knows(String jobId) {
         Objects.requireNonNull(jobId, "jobId");
         return sql.queryFirst(
-                        "SELECT 1 FROM blysisconnect_journal WHERE job_id = ?",
+                        // A deferred job never ran: the site offers it again once its player is back, under the
+                        // same id, and it must run then.
+                        "SELECT 1 FROM blysisconnect_journal WHERE job_id = ?"
+                                + " AND (outcome IS NULL OR outcome <> 'deferred')",
                         statement -> statement.setString(1, jobId),
                         row -> Boolean.TRUE)
                 .isPresent();
@@ -70,10 +73,16 @@ public final class SqlJournal implements Journal {
     @Override
     public void started(String jobId) {
         Objects.requireNonNull(jobId, "jobId");
-        sql.update("INSERT INTO blysisconnect_journal (job_id, started_at) VALUES (?, ?)", statement -> {
-            statement.setString(1, jobId);
-            statement.setLong(2, clock.millis());
-        });
+        // A row left by a deferral is taken over and starts afresh; any other row is never overwritten.
+        sql.update(
+                "INSERT INTO blysisconnect_journal (job_id, started_at) VALUES (?, ?)"
+                        + " ON CONFLICT (job_id) DO UPDATE SET started_at = excluded.started_at, outcome = NULL,"
+                        + " detail = NULL, finished_at = NULL, acknowledged_at = NULL"
+                        + " WHERE blysisconnect_journal.outcome = 'deferred'",
+                statement -> {
+                    statement.setString(1, jobId);
+                    statement.setLong(2, clock.millis());
+                });
     }
 
     @Override

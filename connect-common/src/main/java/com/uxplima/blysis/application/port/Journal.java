@@ -9,11 +9,15 @@ import com.uxplima.blysis.domain.JobResult;
  * What this server did with each job, kept on its own disk so a crash cannot make it run one twice.
  *
  * <p>A job is written {@code started} before its command runs, given an outcome after, and marked
- * acknowledged once the site has the outcome. A job the journal knows is never run again.
+ * acknowledged once the site has the outcome. A job the journal knows is never run again; a deferred one was
+ * never run, so it is not known.
  */
 public interface Journal {
 
-    /** True when this job id was started here before, whatever happened next. */
+    /**
+     * True when this job id was started here before, whatever happened next, except a deferral: a deferred job
+     * never ran, and runs when the site offers it again.
+     */
     boolean knows(String jobId);
 
     /** Records that the job is about to run. */

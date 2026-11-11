@@ -89,4 +89,34 @@ final class SqlJournalTest {
         assertThat(later.sweep()).isEqualTo(1);
         assertThat(later.knows("j1")).isFalse();
     }
+
+    @Test
+    @DisplayName("a deferred job is not known, starts afresh when offered again, and is then known")
+    void aDeferredJobMayStartAgain() {
+        SqlJournal journal = open(Clock.systemUTC());
+        journal.started("j1");
+        journal.finished(new JobResult("j1", Outcome.DEFERRED, "the player left"));
+        journal.acknowledged(List.of("j1"));
+
+        assertThat(journal.knows("j1")).isFalse();
+        journal.started("j1");
+
+        assertThat(journal.knows("j1")).isTrue();
+        assertThat(journal.unfinished()).containsExactly("j1");
+        journal.finished(new JobResult("j1", Outcome.DONE, null));
+        assertThat(journal.unreported()).containsExactly(new JobResult("j1", Outcome.DONE, null));
+    }
+
+    @Test
+    @DisplayName("a job that ran is never started afresh")
+    void aRunJobIsNeverOverwritten() {
+        SqlJournal journal = open(Clock.systemUTC());
+        journal.started("j1");
+        journal.finished(new JobResult("j1", Outcome.DONE, null));
+
+        journal.started("j1");
+
+        assertThat(journal.unfinished()).isEmpty();
+        assertThat(journal.unreported()).containsExactly(new JobResult("j1", Outcome.DONE, null));
+    }
 }

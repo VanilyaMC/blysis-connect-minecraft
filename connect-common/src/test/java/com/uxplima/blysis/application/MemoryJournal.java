@@ -8,6 +8,7 @@ import java.util.Map;
 
 import com.uxplima.blysis.application.port.Journal;
 import com.uxplima.blysis.domain.JobResult;
+import com.uxplima.blysis.domain.Outcome;
 import org.jspecify.annotations.Nullable;
 
 /** A journal in memory, for the use-case tests. The SQLite one has its own test. */
@@ -18,12 +19,14 @@ final class MemoryJournal implements Journal {
 
     @Override
     public boolean knows(String jobId) {
-        return rows.containsKey(jobId);
+        JobResult result = rows.get(jobId);
+        return rows.containsKey(jobId) && (result == null || result.outcome() != Outcome.DEFERRED);
     }
 
     @Override
     public void started(String jobId) {
         rows.put(jobId, null);
+        acknowledged.remove(jobId);
     }
 
     @Override

@@ -119,6 +119,22 @@ final class DeliverJobsTest {
     }
 
     @Test
+    @DisplayName("a deferred job runs when the site offers it again once its player is back")
+    void runsADeferredJobWhenOfferedAgain() {
+        online.clear();
+        Job give = job("j1", "g1", 0, "give Steve diamond");
+        deliver.deliver(List.of(give));
+        online.add("Steve");
+
+        deliver.deliver(List.of(give));
+        deliver.deliver(List.of(give));
+
+        assertThat(ran).containsExactly("give Steve diamond");
+        assertThat(journal.resultOf("j1")).extracting(JobResult::outcome).isEqualTo(Outcome.DONE);
+        assertThat(reports.getLast()).extracting(JobResult::outcome).containsExactly(Outcome.DONE);
+    }
+
+    @Test
     @DisplayName("an outcome the site did not take is sent again with the next report")
     void keepsWhatTheSiteDidNotTake() {
         siteAway = true;
