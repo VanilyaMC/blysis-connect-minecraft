@@ -11,6 +11,8 @@ import java.util.List;
 
 import com.uxplima.blysis.domain.JobResult;
 import com.uxplima.blysis.domain.Outcome;
+import com.uxplima.uxmlib.storage.migration.MigrationResources;
+import com.uxplima.uxmlib.storage.migration.MigrationRunner;
 import com.uxplima.uxmlib.storage.sql.Database;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -136,5 +138,29 @@ final class SqlJournalTest {
         later.unaccepted(List.of("stuck"));
 
         assertThat(later.unreported()).extracting(JobResult::jobId).containsExactly("fresh", "stuck");
+    }
+
+    @Test
+    @DisplayName("a journal made before the report count keeps its rows and gains the count")
+    void upgradesAnOlderJournal() {
+        Database old = Database.builder().sqlite(folder.resolve("journal.db")).build();
+        new MigrationRunner(old, SqlJournal.HISTORY)
+                .apply(
+                        MigrationResources.loadRequired(SqlJournal.class.getClassLoader(), SqlJournal.MIGRATIONS)
+                                .stream()
+                                .filter(migration -> migration.version() == 1)
+                                .toList());
+        new com.uxplima.uxmlib.storage.sql.Sql(old)
+                .update(
+                        "INSERT INTO blysisconnect_journal (job_id, started_at, outcome, finished_at)"
+                                + " VALUES ('j1', 1, 'done', 2)",
+                        statement -> {});
+        old.close();
+
+        SqlJournal journal = open(Clock.systemUTC());
+
+        assertThat(journal.unreported()).containsExactly(new JobResult("j1", Outcome.DONE, null));
+        journal.unaccepted(List.of("j1"));
+        assertThat(journal.knows("j1")).isTrue();
     }
 }
