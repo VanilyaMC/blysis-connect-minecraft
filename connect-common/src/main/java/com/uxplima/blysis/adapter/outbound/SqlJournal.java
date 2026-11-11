@@ -91,7 +91,8 @@ public final class SqlJournal implements Journal {
         String detail = result.detail();
         String kept = detail == null || detail.length() <= DETAIL_LENGTH ? detail : detail.substring(0, DETAIL_LENGTH);
         sql.update(
-                "UPDATE blysisconnect_journal SET outcome = ?, detail = ?, finished_at = ? WHERE job_id = ?",
+                "UPDATE blysisconnect_journal SET outcome = ?, detail = ?, finished_at = ?, report_attempts = 0"
+                        + " WHERE job_id = ?",
                 statement -> {
                     statement.setString(1, result.outcome().wire());
                     statement.setString(2, kept);
@@ -104,7 +105,8 @@ public final class SqlJournal implements Journal {
     public List<JobResult> unreported() {
         return sql.query(
                 "SELECT job_id, outcome, detail FROM blysisconnect_journal"
-                        + " WHERE acknowledged_at IS NULL AND outcome IS NOT NULL ORDER BY finished_at LIMIT ?",
+                        + " WHERE acknowledged_at IS NULL AND outcome IS NOT NULL"
+                        + " ORDER BY report_attempts, finished_at LIMIT ?",
                 statement -> statement.setInt(1, REPORT_BATCH),
                 row -> new JobResult(
                         row.getString("job_id"), outcomeOf(row.getString("outcome")), row.getString("detail")));
@@ -133,6 +135,21 @@ public final class SqlJournal implements Journal {
                             statement.setLong(1, now);
                             statement.setString(2, id);
                         })
+                        .toList());
+    }
+
+    @Override
+    public void unaccepted(Collection<String> jobIds) {
+        Objects.requireNonNull(jobIds, "jobIds");
+        if (jobIds.isEmpty()) {
+            return;
+        }
+        List<String> ids = new ArrayList<>(jobIds);
+        sql.batch(
+                "UPDATE blysisconnect_journal SET report_attempts = report_attempts + 1"
+                        + " WHERE job_id = ? AND acknowledged_at IS NULL",
+                ids.stream()
+                        .<StatementBinder>map(id -> statement -> statement.setString(1, id))
                         .toList());
     }
 

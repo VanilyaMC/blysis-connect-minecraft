@@ -57,6 +57,11 @@ final class MemoryJournal implements Journal {
     }
 
     @Override
+    public void unaccepted(Collection<String> jobIds) {
+        // Order is not modelled here; the SQLite journal's test covers it.
+    }
+
+    @Override
     public void acknowledged(Collection<String> jobIds) {
         acknowledged.addAll(jobIds);
     }

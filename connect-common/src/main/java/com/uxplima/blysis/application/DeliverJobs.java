@@ -90,6 +90,11 @@ public final class DeliverJobs {
         try {
             Set<String> accepted = sink.report(pending);
             journal.acknowledged(accepted);
+            List<String> refused = pending.stream()
+                    .map(JobResult::jobId)
+                    .filter(id -> !accepted.contains(id))
+                    .toList();
+            journal.unaccepted(refused);
         } catch (SiteUnavailable away) {
             // Kept in the journal; the next round sends them again.
         }

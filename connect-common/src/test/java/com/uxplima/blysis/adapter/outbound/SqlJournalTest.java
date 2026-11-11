@@ -119,4 +119,22 @@ final class SqlJournalTest {
         assertThat(journal.unfinished()).isEmpty();
         assertThat(journal.unreported()).containsExactly(new JobResult("j1", Outcome.DONE, null));
     }
+
+    @Test
+    @DisplayName("an outcome the site keeps refusing goes behind the ones it has not refused")
+    void aRefusedOutcomeGoesToTheBack() {
+        Instant start = Instant.parse("2026-10-18T12:00:00Z");
+        SqlJournal journal = open(Clock.fixed(start, ZoneOffset.UTC));
+        journal.started("stuck");
+        journal.finished(new JobResult("stuck", Outcome.DONE, null));
+        closeDatabase();
+        SqlJournal later = open(Clock.fixed(start.plusSeconds(60), ZoneOffset.UTC));
+        later.started("fresh");
+        later.finished(new JobResult("fresh", Outcome.DONE, null));
+        assertThat(later.unreported()).extracting(JobResult::jobId).containsExactly("stuck", "fresh");
+
+        later.unaccepted(List.of("stuck"));
+
+        assertThat(later.unreported()).extracting(JobResult::jobId).containsExactly("fresh", "stuck");
+    }
 }

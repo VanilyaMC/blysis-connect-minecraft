@@ -26,11 +26,17 @@ public interface Journal {
     /** Records what happened. */
     void finished(JobResult result);
 
-    /** Outcomes the site has not acknowledged yet, oldest first. */
+    /** Outcomes the site has not acknowledged yet, the least often refused first, then the oldest. */
     List<JobResult> unreported();
 
     /** Jobs that were started and never given an outcome: the process stopped while they ran. */
     List<String> unfinished();
+
+    /**
+     * Records that a report carried these outcomes and the site did not accept them. They are still reported,
+     * after the outcomes it has not refused yet, so a few it never takes cannot hold back the rest.
+     */
+    void unaccepted(Collection<String> jobIds);
 
     /** Records that the site has these outcomes. */
     void acknowledged(Collection<String> jobIds);
