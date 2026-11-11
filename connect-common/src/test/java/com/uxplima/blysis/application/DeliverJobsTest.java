@@ -135,6 +135,23 @@ final class DeliverJobsTest {
     }
 
     @Test
+    @DisplayName("a deferred command holds back the rest of its purchase, which then runs in order")
+    void aDeferredCommandHoldsBackTheRest() {
+        online.clear();
+        Job rank = job("j1", "g1", 0, "lp user Steve parent add vip");
+        Job any = new Job("j2", "g1", 1, "say thanks Steve", null, false, "VIP");
+
+        deliver.deliver(List.of(rank, any));
+        assertThat(ran).isEmpty();
+        assertThat(journal.resultOf("j2")).extracting(JobResult::outcome).isEqualTo(Outcome.DEFERRED);
+
+        online.add("Steve");
+        deliver.deliver(List.of(rank, any));
+
+        assertThat(ran).containsExactly("lp user Steve parent add vip", "say thanks Steve");
+    }
+
+    @Test
     @DisplayName("an outcome the site did not take is sent again with the next report")
     void keepsWhatTheSiteDidNotTake() {
         siteAway = true;

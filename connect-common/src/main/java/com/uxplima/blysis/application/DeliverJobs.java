@@ -39,6 +39,8 @@ public final class DeliverJobs {
     private static final int STARTED = 1;
     private static final int GIVEN_UP = 2;
 
+    private static final String WAITS_FOR_AN_EARLIER_ONE = "an earlier command of this purchase waits for its player";
+
     private final Journal journal;
     private final Console console;
     private final Presence presence;
@@ -102,14 +104,25 @@ public final class DeliverJobs {
 
     private void runGroup(List<Job> group) {
         boolean failed = false;
+        boolean deferred = false;
         for (Job job : group) {
             if (journal.knows(job.id())) {
                 continue;
             }
             journal.started(job.id());
-            JobResult result = failed ? new JobResult(job.id(), Outcome.FAILED, JobResult.SKIPPED) : run(job);
+            JobResult result;
+            if (failed) {
+                result = new JobResult(job.id(), Outcome.FAILED, JobResult.SKIPPED);
+            } else if (deferred) {
+                // The purchase's commands run in their order: one that waits for its player holds back the rest,
+                // and they all come again together.
+                result = new JobResult(job.id(), Outcome.DEFERRED, WAITS_FOR_AN_EARLIER_ONE);
+            } else {
+                result = run(job);
+            }
             journal.finished(result);
             failed |= result.outcome() == Outcome.FAILED || result.outcome() == Outcome.UNKNOWN;
+            deferred |= result.outcome() == Outcome.DEFERRED;
         }
     }
 
