@@ -192,4 +192,18 @@ final class StayConnectedTest {
 
         assertThat(site.statuses).hasSize(1);
     }
+
+    @Test
+    @DisplayName("anything unexpected in a step backs off and is tried again, never ends the loop")
+    void survivesTheUnexpected() {
+        connection.step();
+        site.polls.add(() -> {
+            throw new IllegalStateException("the journal is locked");
+        });
+
+        assertThat(connection.step()).contains(Duration.ofSeconds(1));
+        assertThat(connection.step()).contains(Duration.ZERO);
+
+        assertThat(said).containsExactly("CONNECTED", "UNREACHABLE", "CONNECTED");
+    }
 }

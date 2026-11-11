@@ -56,7 +56,7 @@ public final class SiteLoop {
         if (running && pushPending.compareAndSet(false, true)) {
             lanes.later(PUSH_SETTLE, () -> {
                 pushPending.set(false);
-                connection.pushStatus(status.get());
+                pushNow();
             });
         }
     }
@@ -69,7 +69,7 @@ public final class SiteLoop {
         Optional<Duration> wait = connection.step();
         if (!greeted && connection.hello().isPresent()) {
             startStatusTimer();
-            connection.pushStatus(status.get());
+            pushNow();
         }
         if (wait.isEmpty() || !running) {
             return;
@@ -81,7 +81,21 @@ public final class SiteLoop {
     private void startStatusTimer() {
         Duration period = statusInterval.get();
         cancel(statusTimer);
-        statusTimer = lanes.every(period, () -> connection.pushStatus(status.get()));
+        statusTimer = lanes.every(period, this::pushNow);
+    }
+
+    /**
+     * One status push. A platform that could not say who is online skips this one: a throw here would end the
+     * step before it schedules the next, and with it every delivery.
+     */
+    private void pushNow() {
+        StatusPush push;
+        try {
+            push = status.get();
+        } catch (RuntimeException unreadable) {
+            return;
+        }
+        connection.pushStatus(push);
     }
 
     private static void cancel(Lanes.@Nullable Cancel handle) {

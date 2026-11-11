@@ -20,7 +20,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Each {@link #step()} makes one call and answers how long to wait before the next, so the platform runs
  * it on its async scheduler and no thread of this plugin's own exists. A site that does not answer is called
- * again after a growing, jittered wait. A site that says stop is not called again until a reload.
+ * again after a growing, jittered wait. A site that says stop is not called again until a reload. Anything
+ * else that goes wrong in a step is treated like a site that does not answer, so the loop never ends by itself.
  */
 public final class StayConnected {
 
@@ -78,6 +79,10 @@ public final class StayConnected {
             return away(refused.code());
         } catch (SiteUnavailable unavailable) {
             return away(String.valueOf(unavailable.getMessage()));
+        } catch (RuntimeException unexpected) {
+            // A journal that could not write, or a watcher that threw: the loop schedules the next step only
+            // from this answer, so anything that escaped here would end deliveries until a restart.
+            return away("unexpected " + unexpected);
         }
     }
 
